@@ -34,8 +34,14 @@ Documentation = "https://github.com/QAToolist/ycurl#readme"
 Issues = "https://github.com/QAToolist/ycurl/issues"
 Source = "https://github.com/QAToolist/ycurl"
 
+[project.scripts]
+ycurl = "ycurl.cli:main"
+
 [tool.hatch.version]
 path = "src/ycurl/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ycurl"]
 
 [tool.hatch.envs.types]
 extra-dependencies = [
