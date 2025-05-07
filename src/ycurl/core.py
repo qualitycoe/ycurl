@@ -1,3 +1,5 @@
+import json
+import os
 import requests
 
 
@@ -7,12 +9,21 @@ def perform_request(config):
     path = config.get("path", "")
     headers = config.get("headers", {})
     params = config.get("params", {})
-    body = config.get("body", None)
-    raw_data = config.get("raw_data", None)
     timeout = config.get("timeout", 30)
+
+    body = config.get("body")
+    raw_data = config.get("raw_data")
+    body_from_file = config.get("body_from_file")
+
     auth = None
     cert = None
     verify = True
+
+    if body_from_file:
+        if not os.path.exists(body_from_file):
+            raise FileNotFoundError(f"JSON body file '{body_from_file}' not found.")
+        with open(body_from_file, "r") as f:
+            body = json.load(f)
 
     # Authentication
     if "auth" in config:
