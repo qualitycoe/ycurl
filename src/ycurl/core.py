@@ -39,11 +39,18 @@ def perform_request(config, dry_run=False):
             headers["Authorization"] = f"Bearer {token}"
 
     # Cert
-    if "certificates" in config:
-        cert_path = config["certificates"].get("cert")
-        key_path = config["certificates"].get("key")
-        verify = config["certificates"].get("verify", True)
-        cert = (cert_path, key_path) if key_path else cert_path
+
+    cert_config = config.get("certificates", {})
+    cert_path = cert_config.get("cert")
+    key_path = cert_config.get("key")
+    verify = cert_config.get("verify", False)
+    cert = None
+
+    # If both cert and key are given, use as tuple
+    if cert_path and key_path:
+        cert = (cert_path, key_path)
+    elif cert_path:
+        cert = cert_path  # Assume PEM file includes both cert and key
 
     url = build_url(base_url, path, params)
 
