@@ -1,0 +1,30 @@
+base_url: https://api.example.com
+path: /v1/resource
+method: POST
+
+headers:
+  Content-Type: application/json
+  Accept: application/json
+  Custom-Header: "value123"
+
+params:
+  page: 1
+  per_page: 50
+
+auth:
+  type: bearer
+  token: your_oauth_token_here
+
+body:
+  name: "example"
+  tags:
+    - "python"
+    - "yaml"
+  active: true
+
+certificates:
+  cert: ./certs/client.crt
+  key: ./certs/client.key
+  verify: ./certs/ca_bundle.crt  # Or false to disable (not recommended)
+
+timeout: 20
