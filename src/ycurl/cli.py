@@ -1,68 +1,65 @@
-"""Command‑line interface built with Click."""
+# src/ycurl/cli.py
+"""Command‑line interface for ycurl (Typer version)."""
 
 from __future__ import annotations
 
-import asyncio
+import sys
 from pathlib import Path
 
-import click
+import typer
 from rich.console import Console
-from rich.table import Table
 
-from .config import ConfigLoader
-from .constants import APP_MARKER
-from .exceptions import EndpointNotFound
-from .http_client import RequestExecutor
+from .executor import EndpointExecutor
 from .registry import Registry
-from .utils import find_app_root, pretty_print_json
+from .scaffold import create_app_structure
 
 console = Console()
+app = typer.Typer(add_completion=False, no_args_is_help=True)
+
+# --------------------------------------------------------------------------- #
+# Shared option objects (keeps Ruff happy about B008)                         #
+# --------------------------------------------------------------------------- #
+ENV_OPT = typer.Option(None, "--env", help="Environment to use (dev, prod …)")
+CURLIFY_OPT = typer.Option(False, "--curlify", help="Show equivalent curl command")
+OUTPUT_OPT = typer.Option(
+    None, "--output", exists=False, help="Write response body to file"
+)
+QUIET_OPT = typer.Option(False, "--quiet", help="Suppress logs (except body)")
+ONLY_STATUS_OPT = typer.Option(False, "--only-status", help="Show only HTTP status")
+
+INIT_PATH_OPT = typer.Option(
+    Path("."),
+    "--path",
+    file_okay=False,
+    dir_okay=True,
+    writable=True,
+    help="Where to create the app",
+)
 
 
-@click.group(
-    context_settings={"help_option_names": ["-h", "--help"]},
-    invoke_without_command=True,
-)
-@click.pass_context
-@click.option("--env", "env", help="Environment to use (dev, prod, ...)")
-@click.option("--dry-run", is_flag=True, help="Print request without sending")
-@click.option("--curlify", is_flag=True, help="Print equivalent curl command")
-@click.option(
-    "--curlify-copy", is_flag=True, help="Print curl and copy to clipboard", hidden=True
-)
-@click.option(
-    "--output",
-    "output_path",
-    type=click.Path(writable=True),
-    help="Write response body to file",
-)
-@click.option("--quiet", is_flag=True, help="Suppress logs, show only response body")
-@click.option("--only-status", is_flag=True, help="Show only HTTP status code")
-@click.argument("endpoint", required=False)
-def cli(
-    ctx: click.Context,
-    env: str | None,
-    dry_run: bool,
-    curlify: bool,
-    curlify_copy: bool,
-    output_path: str | None,
-    quiet: bool,
-    only_status: bool,
-    endpoint: str | None,
+# --------------------------------------------------------------------------- #
+@app.callback(invoke_without_command=True)  # type: ignore[misc]
+def main_callback(
+    ctx: typer.Context,
+    endpoint: str | None = typer.Argument(None, help="Endpoint name to run"),
+    env: str | None = ENV_OPT,
+    curlify: bool = CURLIFY_OPT,
+    output_path: Path | None = OUTPUT_OPT,
+    quiet: bool = QUIET_OPT,
+    only_status: bool = ONLY_STATUS_OPT,
 ) -> None:
-    """ycurl – run or manage shareable HTTP request recipes."""
+    """Run an endpoint or dispatch to a sub‑command."""
     if ctx.invoked_subcommand is not None:
-        # sub‑command like init, list-local
         return
 
     if endpoint is None:
-        click.echo(ctx.get_help())
-        return
+        console.print("[red]Error:[/] No endpoint specified.", highlight=False)
+        raise typer.Exit(1)
 
+    # mypy now knows endpoint is str
     _run_endpoint(
         endpoint,
         env=env,
-        dry_run=dry_run,
         curlify=curlify,
         output_path=output_path,
         quiet=quiet,
@@ -70,121 +67,76 @@ def cli(
     )
 
 
-# ==================================================
-# Sub‑commands
-# ==================================================
+# --------------------------------------------------------------------------- #
+@app.command("init")  # type: ignore[misc]
+def init(
+    app_name: str = typer.Argument(..., help="Name of the new ycurl app"),
+    path: Path = INIT_PATH_OPT,
+) -> None:
+    """Create a new ycurl application scaffold."""
+    app_dir = create_app_structure(app_name, path)
+    console.print(f"[green]✔ App created:[/] {app_dir}")
 
 
-@cli.command("init")
-@click.argument("app_name", type=str)
-@click.option(
-    "--path",
-    "base_path",
-    type=click.Path(file_okay=False, dir_okay=True),
-    default=".",
-    help="Directory to create the app in",
-)
-def init_app(app_name: str, base_path: str) -> None:
-    """Initialise a new ycurl project."""
-    base = Path(base_path).resolve()
-    app_dir = base / app_name
-    endpoints_dir = app_dir / "endpoints"
-    app_dir.mkdir(parents=True, exist_ok=True)
-    endpoints_dir.mkdir(exist_ok=True)
-
-    (app_dir / APP_MARKER).touch()
-    (app_dir / f"{app_name}.default.yaml").write_text(
-        "# base config\nbase_url: \nheaders: {}\n", encoding="utf‑8"
-    )
-    Registry().add(app_name, app_dir)
-    console.print(f"[green]Initialised ycurl app in {app_dir}")
-
-
-@cli.command("list-local")
+@app.command("list-local")  # type: ignore[misc]
 def list_local() -> None:
-    """Show all registered ycurl apps."""
-    reg = Registry()
-    table = Table(title="Registered ycurl projects")
-    table.add_column("Name")
-    table.add_column("Path")
-    table.add_column("Created")
-
-    for proj in reg.list_all():
-        table.add_row(proj["name"], proj["path"], proj["created"])
-    console.print(table)
+    """List all registered ycurl apps on this machine."""
+    for entry in Registry().all():
+        console.print(f"[bold]{entry.name}[/] → {entry.path}")
 
 
-@cli.command("complete")
-@click.argument("shell", type=click.Choice(["bash", "zsh"]))
-def complete(shell: str) -> None:
-    """Generate shell completion snippet."""
-    if shell == "bash":
-        snippet = "_YCURL_COMPLETE=bash_source ycurl"
-    else:
-        snippet = "_YCURL_COMPLETE=zsh_source ycurl"
-    console.print(snippet)
+@app.command("complete")  # type: ignore[misc]
+def complete(shell: str = typer.Argument(..., help="bash | zsh")) -> None:
+    """Emit a one‑liner for shell completion."""
+    if shell not in {"bash", "zsh"}:
+        console.print("Supported shells: bash, zsh", style="red")
+        raise typer.Exit(1)
+    cmd = f"_YCURL_COMPLETE={shell}_source ycurl"
+    console.print(cmd)
 
 
-# ==================================================
-# Internal execution helper
-# ==================================================
-
-
+# --------------------------------------------------------------------------- #
 def _run_endpoint(
     endpoint_name: str,
     *,
     env: str | None,
-    dry_run: bool,
     curlify: bool,
-    output_path: str | None,
+    output_path: Path | None,
     quiet: bool,
     only_status: bool,
 ) -> None:
-    app_root = find_app_root()
-    if app_root is None:
-        raise click.ClickException("Not inside a ycurl app (missing .ycurl)")
+    """Prepare, execute, and print an endpoint request/response."""
+    executor = EndpointExecutor(
+        endpoint_name,
+        env=env,
+        curlify=curlify,
+        dry_run=False,
+    )
 
-    endpoint_file = app_root / "endpoints" / f"{endpoint_name}.yaml"
-    if not endpoint_file.exists():
-        raise EndpointNotFound(f"Endpoint YAML not found: {endpoint_file}")
-
-    cfg_loader = ConfigLoader(env=env, app_root=app_root)
-    resolved = cfg_loader.resolve(endpoint_file)
-    merged = resolved.merged
-
-    executor = RequestExecutor(merged)
     prepared = executor.prepare()
 
-    # Handle meta‑flags
-    if curlify or dry_run:
+    if curlify:
         console.print(prepared.as_curl())
-        if dry_run:
-            return
+        sys.exit(0)
 
-    if curlify:  # only curlify but still execute
-        console.print()
-
-    # Send the HTTP request
-    resp = asyncio.run(executor.send(prepared))
+    response = executor.execute()
 
     if only_status:
-        console.print(resp.status_code)
-        return
+        console.print(str(response.status_code))
+        sys.exit(0)
 
     if not quiet:
         console.print(
-            f"[bold]{resp.status_code}[/] {resp.reason_phrase} – {resp.elapsed.total_seconds():.2f}s"
+            f"[bold]{response.status_code}[/] {response.reason_phrase} "
+            f"({response.elapsed.total_seconds():.2f}s)"
         )
 
-    # Body printing / save to file
-    body_bytes = resp.content
+    console.print(response.pretty_body())
+
     if output_path:
-        Path(output_path).write_bytes(body_bytes)
-        if not quiet:
-            console.print(f"[green]Body written to {output_path}")
-    else:
-        content_type = resp.headers.get("content-type", "")
-        if "application/json" in content_type:
-            pretty_print_json(body_bytes)
-        else:
-            console.print(body_bytes.decode(errors="replace"))
+        output_path.write_text(response.body, encoding="utf-8")
+        console.print(f"[dim]Body written to {output_path}[/]")
+
+
+if __name__ == "__main__":
+    app()
