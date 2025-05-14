@@ -16,9 +16,8 @@ from .utils import curlify, pretty_print_json
 _AUTH_ORDER = ("token", "basic_auth")  # deterministic precedence
 
 
-# ------------------------------------------------------------------ #
 class _RichResponse:
-    """Wrapper that adds `.body` and `.pretty_body()` helpers."""
+    """Minimal wrapper around httpx.Response with pretty-print helpers."""
 
     def __init__(self, raw: httpx.Response) -> None:
         self._raw = raw
@@ -26,28 +25,22 @@ class _RichResponse:
         self.reason_phrase = raw.reason_phrase
         self.elapsed = raw.elapsed
 
-    # Mimic earlier convenience attrs
+    # ------------------------------------------------------------------ #
     @property
     def body(self) -> Any:
         """
-
-        returns Body
+        Dummy Summary
 
         Returns:
             Any: _description_
         """
         return self._raw.text
 
-    def pretty_body(self) -> Any:
+    def pretty_body(self) -> None:
         """
-
-        Returns pretty body
-
-        Returns:
-            Any: _description_
+        Dummy Summary
         """
         pretty_print_json(self._raw.content)
-        return self.body
 
 
 class EndpointExecutor:
@@ -69,19 +62,18 @@ class EndpointExecutor:
 
     # ------------------------------------------------------------------ #
     def prepare(self) -> PreparedRequest:
-        """Merge configs and return a `PreparedRequest` ready for sending."""
+        """Merge configs and return a `PreparedRequest`."""
         if self._resolved is None:
             self._resolved = self._load()
 
         res = self._resolved
-        ep_cfg = res.endpoint_cfg["endpoint"]
+        ep_cfg = res.endpoint_cfg
 
         headers: dict[str, str] = {
             **res.merged.get("headers", {}),
             **res.endpoint_cfg.get("headers", {}),
         }
 
-        # Auth helpers (token beats basic-auth if both present)
         for k in _AUTH_ORDER:
             if k in res.merged:
                 val = res.merged[k]
@@ -103,8 +95,8 @@ class EndpointExecutor:
         )
 
     # ------------------------------------------------------------------ #
-    def execute(self) -> _RichResponse:  # ← return wrapper, not httpx.Response
-        """Send the request; wrap httpx.Response for rich printing."""
+    def execute(self) -> _RichResponse:
+        """Send the request; return a rich wrapper around httpx.Response."""
         req = self.prepare()
 
         if self._dry_run:
@@ -127,7 +119,6 @@ class EndpointExecutor:
 
     # ------------------------------------------------------------------ #
     def _load(self) -> ResolvedConfig:
-        """Load and merge configuration layers for this endpoint."""
         ep_file = (
             self._cfg_loader.app_root
             / "endpoints"

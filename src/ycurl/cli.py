@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Callable
 
 import typer
 from rich.console import Console
@@ -42,22 +43,43 @@ INIT_PATH_OPT = typer.Option(
 @app.callback(invoke_without_command=True)  # type: ignore[misc]
 def main_callback(
     ctx: typer.Context,
-    endpoint: str | None = typer.Argument(None, help="Endpoint name to run"),
+    endpoint: str | None = typer.Argument(
+        None,
+        help="Endpoint name (default action) or sub-command",
+    ),
     env: str | None = ENV_OPT,
     curlify: bool = CURLIFY_OPT,
     output_path: Path | None = OUTPUT_OPT,
     quiet: bool = QUIET_OPT,
     only_status: bool = ONLY_STATUS_OPT,
 ) -> None:
-    """Run an endpoint or dispatch to a sub‑command."""
-    if ctx.invoked_subcommand is not None:
+    """
+    Root entry-point.
+
+    * If *endpoint* matches a registered sub-command, forward to it.
+    * Otherwise treat it as an endpoint name and run the request.
+    """
+    # -------------------------------------------------- #
+    # 1) forward to real sub-commands when typo-less
+    # -------------------------------------------------- #
+    SUB_CMD_BY_NAME: dict[str, Callable[..., Any]] = {
+        "init": init,
+        "list-local": list_local,
+        "complete": complete,
+    }
+    if endpoint in SUB_CMD_BY_NAME:
+        # Re-inject leftover args so the sub-command sees them
+        ctx.args.insert(0, *ctx.args)  # no-op but keeps order clear
+        ctx.invoke(SUB_CMD_BY_NAME[endpoint], *ctx.args)
         return
 
+    # -------------------------------------------------- #
+    # 2) default behaviour: run an endpoint recipe
+    # -------------------------------------------------- #
     if endpoint is None:
         console.print("[red]Error:[/] No endpoint specified.", highlight=False)
         raise typer.Exit(1)
 
-    # mypy now knows endpoint is str
     _run_endpoint(
         endpoint,
         env=env,

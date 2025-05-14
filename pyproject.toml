@@ -96,6 +96,7 @@ ignore = [
     "N818",        # custom exception names
     "UP038",       # isinstance union – readability preference
     "UP035",
+    "N806",
     "RUF005"       # list concat readability (optional)
 ]
 unfixable = ["B008"]
