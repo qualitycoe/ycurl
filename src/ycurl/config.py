@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any
 
 from .constants import DEFAULT_ENV, GLOBAL_CONFIG
 from .exceptions import ConfigNotFound
@@ -21,7 +22,7 @@ class ResolvedConfig:
     endpoint_cfg: Mapping[str, Any]
 
     @property
-    def merged(self) -> Dict[str, Any]:
+    def merged(self) -> dict[str, Any]:
         return deep_merge(
             self.global_cfg, self.app_cfg, self.env_cfg, self.endpoint_cfg
         )
@@ -53,11 +54,13 @@ class ConfigLoader:
     # internal helpers
     # --------------------------------------------------
     def _app_default_cfg(self) -> Path:
+        assert self.app_root is not None  # noqa: S101
         name = self.app_root.name
         return self.app_root / f"{name}.default.yaml"
 
     def _app_env_cfg(self) -> Path:
+        assert self.app_root is not None  # noqa: S101
         if self.env == DEFAULT_ENV:
-            return Path("/dev/null")  # dummy path
+            return Path("/dev/null")
         name = self.app_root.name
         return self.app_root / f"{name}.{self.env}.yaml"

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import shlex
-import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping
+from typing import Any
 
 import yaml
 from deepmerge import Merger
@@ -25,16 +25,16 @@ _merger = Merger(
 )
 
 
-def deep_merge(*dicts: Mapping[str, Any]) -> Dict[str, Any]:
+def deep_merge(*dicts: Mapping[str, Any]) -> dict[str, Any]:
     """Return a deeply merged dict (left‑to‑right precedence)."""
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
     for d in dicts:
         if d:
-            out = _merger.merge(out, d)  # type: ignore[arg-type]
+            out = _merger.merge(out, d)
     return out
 
 
-def yaml_safe_load(path: Path) -> Dict[str, Any]:
+def yaml_safe_load(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     with path.open("r", encoding="utf‑8") as fh:

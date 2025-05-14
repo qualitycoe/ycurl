@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
-import mimetypes
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping
+from typing import Any
 
 import httpx
 from rich.console import Console
 
 from .constants import DEFAULT_TIMEOUT
 from .exceptions import InvalidCertificatePair
-from .utils import curlify, pretty_print_json
+from .utils import curlify
 
 console = Console()
 

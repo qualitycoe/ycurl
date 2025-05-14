@@ -12,7 +12,7 @@ from rich.table import Table
 from .config import ConfigLoader
 from .constants import APP_MARKER
 from .exceptions import EndpointNotFound
-from .http_client import PreparedRequest, RequestExecutor
+from .http_client import RequestExecutor
 from .registry import Registry
 from .utils import find_app_root, pretty_print_json
 
@@ -49,7 +49,7 @@ def cli(
     quiet: bool,
     only_status: bool,
     endpoint: str | None,
-):
+) -> None:
     """ycurl – run or manage shareable HTTP request recipes."""
     if ctx.invoked_subcommand is not None:
         # sub‑command like init, list-local

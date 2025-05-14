@@ -68,3 +68,50 @@ exclude_lines = [
   "if __name__ == .__main__.:",
   "if TYPE_CHECKING:",
 ]
+
+# Ruff configuration for ycurl (updated for Ruff ≥0.4 schema)
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+target-version = "py313"
+src = ["src", "tests"]
+respect-gitignore = true
+exclude = [
+    ".git", ".hg", ".mypy_cache", ".ruff_cache", ".pytest_cache", ".venv",
+    "__pypackages__", "build", "dist"
+]
+
+# -----------------------------------------------------------------------------
+# Lint options live in their own table as of Ruff 0.3+
+# -----------------------------------------------------------------------------
+[tool.ruff.lint]
+select = [
+    "E", "F", "I", "N", "B", "S", "C4", "SIM", "UP", "PL", "RUF"
+]
+ignore = [
+    "E501",        # handled by formatter
+    "RUF001", "RUF002", "RUF003",   # Unicode dash ambiguity
+    "PLR0913",     # arg count (OK for Click callbacks)
+    "N818",        # custom exception names
+    "UP038",       # isinstance union – readability preference
+    "RUF005"       # list concat readability (optional)
+]
+unfixable = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "D", "PLR2004"]
+
+# -----------------------------------------------------------------------------
+# Formatter (Black‑style) options
+# -----------------------------------------------------------------------------
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+# -----------------------------------------------------------------------------
+# Docstring style (Google)
+# -----------------------------------------------------------------------------
+[tool.ruff.lint.pydocstyle]
+convention = "google"

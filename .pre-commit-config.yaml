@@ -1,85 +1,71 @@
-# .pre-commit-config.yaml
+# .pre-commit-config.yaml — ycurl project (ruff‑centric, revised)
 ---
-minimum_pre_commit_version: "3.0.0"
+minimum_pre_commit_version: "3.3.0"
+
 default_language_version:
-  python: python3.11          # keep in sync with CI & hatch env
+  python: python3.13.2
+
+default_stages: [pre-commit, pre-push]
 
 repos:
-  # ───────────────────────────── Formatting & Imports ────────────────────────────
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: ["--profile", "black"]
-        # run before black so black can make final tweaks
-        stages: [commit, push]
-        always_run: true
-
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
-        language_version: python3.11
-        stages: [commit, push]
-        always_run: true
-
-  # ─────────────────────────────── Code Quality ──────────────────────────────────
+  # ───────────── Ruff (formatter + linter + import sorting + Bandit rules) ─────────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.0
+    rev: v0.11.9
     hooks:
       - id: ruff
-        args: ["--fix", "--show-source"]   # auto‑fix where possible
-        exclude: |
-          tests/data/.*                   # skip static fixtures if any
-        stages: [commit, push]
+        args:
+          - --fix
+          - --extend-select
+          - I,S            # import sorting + security rules
+      - id: ruff-format
 
+  # ───────────── Static typing ─────────────
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0
+    rev: v1.15.0
     hooks:
       - id: mypy
         args:
-          [
-            "--install-types",
-            "--non-interactive",
-            "--strict",
-            "src/ycurl",
-          ]
+          - --install-types
+          - --non-interactive
+          - --strict
+          - --config-file=mypy.ini
+          - --explicit-package-bases
+        entry: mypy
+        require_serial: true
         additional_dependencies:
-          [
-            "types-PyYAML",
-            "types-requests",
-            "types-click",
-          ]
-        stages: [commit, push]
+          - types-PyYAML
+          - types-click
+          - types-requests
 
-  # ───────────────────────────── Security / Secrets ──────────────────────────────
+  # ───────────── Security / secrets ─────────────
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.8
+    rev: 1.8.3
     hooks:
       - id: bandit
-        name: bandit (security static analysis)
-        args: ["-r", "src/ycurl", "-ll"]   # level: low+medium+high
-        stages: [commit, push]
+        name: bandit (deep security scan)
+        args: ["-r", "src/ycurl", "-ll"]
+        stages: [pre-push]
 
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        args: ["--baseline", ".secrets.baseline"]
-        stages: [commit, push]
 
-  # ─────────────────────────────── YAML & JSON ───────────────────────────────────
-  - repo: https://github.com/pre-commit/mirrors-yamllint
-    rev: v1.35.1
+  # ───────────── YAML & JSON hygiene ─────────────
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.37.1
     hooks:
       - id: yamllint
+        # Relax 80‑char rule: allow 120 for config readability
+        args:
+          - -d
+          - '{extends: default, rules: {line-length: {max: 120}}}'
         files: "\\.(ya?ml)$"
-        stages: [commit, push]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
-      - id: check-yaml          # syntax check only
+      - id: check-yaml
       - id: check-json
       - id: end-of-file-fixer
       - id: trailing-whitespace
@@ -87,28 +73,24 @@ repos:
       - id: debug-statements
       - id: check-merge-conflict
 
-  # ─────────────────────────────── Shell Scripts ─────────────────────────────────
+  # ───────────── Shell scripts ─────────────
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.10.0
     hooks:
       - id: shellcheck
         files: "\\.(sh|bash)$"
 
-  - repo: https://github.com/mvdan/sh
-    rev: v4.6.0
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.11.0-1
     hooks:
       - id: shfmt
-        args: ["-i", "2", "-ci"]
-        files: "\\.(sh|bash)$"
 
-  # ───────────────────────────── Commit Message ──────────────────────────────────
+  # ───────────── Commit message linting ─────────────
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.21.1
+    rev: v4.7.0
     hooks:
       - id: commitizen
-        stages: [commit-msg]     # enforces Conventional Commits
+        stages: [commit-msg]
 
-# Run hooks automatically on git push in addition to commit
-# (helps catch issues in bulk operations like `git rebase -i`)
 ci:
   parallel: true
