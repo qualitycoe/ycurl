@@ -115,3 +115,10 @@ line-ending = "auto"
 # -----------------------------------------------------------------------------
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.bandit]
+exclude_dirs = [
+    ".venv",
+    ".git",
+    "__pycache__",
+]
