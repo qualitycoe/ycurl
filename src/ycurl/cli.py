@@ -15,6 +15,7 @@ from .utils import curlify as cfy
 
 console = Console()
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+cli = app
 
 # --------------------------------------------------------------------------- #
 # Shared option objects (keeps Ruff happy about B008)                         #
@@ -138,4 +139,4 @@ def _run_endpoint(
 
 
 if __name__ == "__main__":
-    app()
+    cli()
