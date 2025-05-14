@@ -95,6 +95,7 @@ ignore = [
     "PLR0913",     # arg count (OK for Click callbacks)
     "N818",        # custom exception names
     "UP038",       # isinstance union – readability preference
+    "UP035",
     "RUF005"       # list concat readability (optional)
 ]
 unfixable = ["B008"]

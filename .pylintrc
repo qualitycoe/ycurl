@@ -1,0 +1,3 @@
+[MASTER]
+# Add the "src" directory to sys.path so pylint finds first‑party imports
+init-hook = 'import sys, pathlib, os; sys.path.append(str(pathlib.Path(__file__).parent / "src"))'

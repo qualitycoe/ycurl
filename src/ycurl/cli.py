@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import typer
@@ -12,6 +11,7 @@ from rich.console import Console
 from .executor import EndpointExecutor
 from .registry import Registry
 from .scaffold import create_app_structure
+from .utils import curlify as cfy
 
 console = Console()
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -109,21 +109,20 @@ def _run_endpoint(
     executor = EndpointExecutor(
         endpoint_name,
         env=env,
-        curlify=curlify,
         dry_run=False,
     )
 
     prepared = executor.prepare()
 
     if curlify:
-        console.print(prepared.as_curl())
-        sys.exit(0)
+        console.print(cfy(prepared))
+        raise typer.Exit(0)
 
     response = executor.execute()
 
     if only_status:
         console.print(str(response.status_code))
-        sys.exit(0)
+        raise typer.Exit(0)
 
     if not quiet:
         console.print(
@@ -131,7 +130,7 @@ def _run_endpoint(
             f"({response.elapsed.total_seconds():.2f}s)"
         )
 
-    console.print(response.pretty_body())
+    response.pretty_body()
 
     if output_path:
         output_path.write_text(response.body, encoding="utf-8")

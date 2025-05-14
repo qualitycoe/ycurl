@@ -60,7 +60,8 @@ class ConfigLoader:
 
         global_cfg = yaml_safe_load(GLOBAL_CONFIG)
         app_cfg = yaml_safe_load(self._app_default_cfg())
-        env_cfg = yaml_safe_load(self._app_env_cfg())
+        env_path = self._app_env_cfg()
+        env_cfg = yaml_safe_load(env_path) if env_path and env_path.exists() else {}
         endpoint_cfg = yaml_safe_load(endpoint_file)
 
         return ResolvedConfig(global_cfg, app_cfg, env_cfg, endpoint_cfg)
@@ -73,7 +74,7 @@ class ConfigLoader:
         name = self.app_root.name
         return self.app_root / f"{name}.default.yaml"
 
-    def _app_env_cfg(self) -> Path:
+    def _app_env_cfg(self) -> Path | None:
         if self.env == DEFAULT_ENV:
             return Path("/dev/null")  # sentinel path for “no env override”
         name = self.app_root.name
