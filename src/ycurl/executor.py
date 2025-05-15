@@ -10,6 +10,7 @@ from rich import print as rprint
 
 from .config import ConfigLoader, ResolvedConfig
 from .constants import DEFAULT_ENV
+from .dynload import load_hooks
 from .request import PreparedRequest
 from .utils import curlify, pretty_print_json
 
@@ -59,12 +60,17 @@ class EndpointExecutor:
         self._cfg_loader = ConfigLoader(env=env or DEFAULT_ENV)
         self._resolved = None
         self._dry_run = dry_run
+        self._hooks = load_hooks(self._cfg_loader.app_root)
 
     # ------------------------------------------------------------------ #
     def prepare(self) -> PreparedRequest:
         """Merge configs and return a `PreparedRequest`."""
         if self._resolved is None:
             self._resolved = self._load()
+
+        merged_cfg = self._resolved.merged
+        if fn := self._hooks.get("after_config"):
+            merged_cfg = fn(merged_cfg) or merged_cfg
 
         res = self._resolved
         ep_cfg = res.endpoint_cfg
@@ -87,12 +93,17 @@ class EndpointExecutor:
             body = json.dumps(body, separators=(",", ":"))
             headers.setdefault("Content-Type", "application/json")
 
-        return PreparedRequest(
+        req = PreparedRequest(
             method=ep_cfg.get("method", "GET"),
             url=res.merged["base_url"].rstrip("/") + ep_cfg["path"],
             headers=headers,
             body=body,
         )
+
+        if fn := self._hooks.get("after_prepare"):
+            req = fn(req) or req
+
+        return req
 
     # ------------------------------------------------------------------ #
     def execute(self) -> _RichResponse:
@@ -115,6 +126,10 @@ class EndpointExecutor:
                 data=cast(Any, req.body),  # httpx accepts str/bytes
                 params=self._resolved.endpoint_cfg.get("params", {}),
             )
+
+        if fn := self._hooks.get("after_response"):
+            fn(raw.content)
+
         return _RichResponse(raw)
 
     # ------------------------------------------------------------------ #

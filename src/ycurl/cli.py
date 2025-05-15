@@ -15,7 +15,11 @@ from .scaffold import create_app_structure
 from .utils import curlify as cfy
 
 console = Console()
-app = typer.Typer(add_completion=False, no_args_is_help=True)
+app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
 cli = app
 
 # --------------------------------------------------------------------------- #
@@ -28,6 +32,9 @@ OUTPUT_OPT = typer.Option(
 )
 QUIET_OPT = typer.Option(False, "--quiet", help="Suppress logs (except body)")
 ONLY_STATUS_OPT = typer.Option(False, "--only-status", help="Show only HTTP status")
+DRY_RUN_OPT = typer.Option(
+    False, "--dry-run", help="Show request details, send nothing"
+)
 
 INIT_PATH_OPT = typer.Option(
     Path("."),
@@ -49,6 +56,7 @@ def main_callback(
     ),
     env: str | None = ENV_OPT,
     curlify: bool = CURLIFY_OPT,
+    dry_run: bool = DRY_RUN_OPT,
     output_path: Path | None = OUTPUT_OPT,
     quiet: bool = QUIET_OPT,
     only_status: bool = ONLY_STATUS_OPT,
@@ -68,13 +76,33 @@ def main_callback(
         "complete": complete,
     }
     if endpoint in SUB_CMD_BY_NAME:
-        # Re-inject leftover args so the sub-command sees them
-        ctx.args.insert(0, *ctx.args)  # no-op but keeps order clear
         ctx.invoke(SUB_CMD_BY_NAME[endpoint], *ctx.args)
         return
 
+    # ----------------------------------------------------------------------------
+    # 2) Manual parse of leftover CLI tokens so users can put flags after endpoint
+    # ----------------------------------------------------------------------------
+    tokens = list(ctx.args)  # copy; we'll pop() as we parse
+    while tokens:
+        tok = tokens.pop(0)
+        if tok == "--env" and tokens:
+            env = tokens.pop(0)
+        elif tok == "--curlify":
+            curlify = True
+        elif tok == "--dry-run":
+            dry_run = True
+        elif tok == "--output" and tokens:
+            output_path = Path(tokens.pop(0))
+        elif tok == "--quiet":
+            quiet = True
+        elif tok == "--only-status":
+            only_status = True
+        else:
+            console.print(f"[red]Unknown or misplaced option:[/] {tok}")
+            raise typer.Exit(1)
+
     # -------------------------------------------------- #
-    # 2) default behaviour: run an endpoint recipe
+    # 3) default behaviour: run an endpoint recipe
     # -------------------------------------------------- #
     if endpoint is None:
         console.print("[red]Error:[/] No endpoint specified.", highlight=False)
@@ -84,6 +112,7 @@ def main_callback(
         endpoint,
         env=env,
         curlify=curlify,
+        dry_run=dry_run,
         output_path=output_path,
         quiet=quiet,
         only_status=only_status,
@@ -124,6 +153,7 @@ def _run_endpoint(
     *,
     env: str | None,
     curlify: bool,
+    dry_run: bool,
     output_path: Path | None,
     quiet: bool,
     only_status: bool,
@@ -132,7 +162,7 @@ def _run_endpoint(
     executor = EndpointExecutor(
         endpoint_name,
         env=env,
-        dry_run=False,
+        dry_run=dry_run,
     )
 
     prepared = executor.prepare()
